@@ -462,11 +462,22 @@ class USATodayDownloader(BaseDownloader):
         self.puzfile.clues = clues
 
 
+class SiteSubparser:
+    def __init__(self, full_name, command, aliases, tools, downloader):
+        self.full_name = full_name
+
+        self.command = command
+        self.aliases = aliases
+
+        self.tools = tools
+
+        self.downloader = downloader
+
+        self.help = 'download {} puzzle'.format(self.full_name)
+
+
 def main():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('url', nargs="?",
-                            help='URL of puzzle to download')
 
     extractor_parent = argparse.ArgumentParser(add_help=False)
     extractor_parent.add_argument('-o', '--output',
@@ -486,90 +497,98 @@ def main():
 
     date_parent = argparse.ArgumentParser(add_help=False)
     date_parent.add_argument('-d', '--date', nargs='*', metavar='',
-                            help='a specific puzzle date to select')
+                            help='provide a specific puzzle date')
 
 
     url_parent = argparse.ArgumentParser(add_help=False)
     url_parent.add_argument('-u', '--url', metavar='URL', dest='spec_url',
-                            help='a specific puzzle URL to download')
+                            help='provide a specific puzzle URL to download')
 
     subparsers = parser.add_subparsers(title='sites',
                             description='Supported puzzle sources',
                             dest='subparser_name')
 
-    newyorker_parser = subparsers.add_parser('tny',
-                            aliases=['newyorker', 'nyer'],
-                            parents=[latest_parent,
-                                     date_parent,
-                                     url_parent,
-                                     extractor_parent],
-                            help="download a New Yorker puzzle")
-    newyorker_parser.set_defaults(downloader_class=NewYorkerDownloader)
+    sites = [SiteSubparser(full_name='New Yorker',
+                           command='tny',
+                           aliases=[],
+                           tools=[latest_parent,
+                                  date_parent,
+                                  url_parent],
+                           downloader=NewYorkerDownloader),
 
-    newsday_parser = subparsers.add_parser('nd',
-                            aliases=['newsday'],
-                            parents=[latest_parent,
-                                     date_parent,
-                                     extractor_parent],
-                            help="download a Newsday puzzle")
-    newsday_parser.set_defaults(downloader_class=NewsdayDownloader)
+             SiteSubparser(full_name='Newsday',
+                           command='nd',
+                           aliases=['newsday'],
+                           tools=[latest_parent,
+                                  date_parent],
+                           downloader=NewsdayDownloader),
 
-    wsj_parser = subparsers.add_parser('wsj',
-                            aliases=['wallstreet'],
-                            parents=[latest_parent,
-                                     url_parent,
-                                     extractor_parent],
-                            help="download a Wall Street Journal puzzle")
-    wsj_parser.set_defaults(downloader_class=WSJDownloader)
+             SiteSubparser(full_name='Wall Street Journal',
+                           command='wsj',
+                           aliases=[],
+                           tools=[latest_parent,
+                                  url_parent],
+                           downloader=WSJDownloader),
 
-    lat_parser = subparsers.add_parser('lat',
-                            aliases=['latimes'],
-                            parents=[latest_parent,
-                                     date_parent,
-                                     extractor_parent],
-                            help="download an LA Times Puzzle")
-    lat_parser.set_defaults(downloader_class=LATimesDownloader)
+             SiteSubparser(full_name='LA Times',
+                           command='lat',
+                           aliases=[],
+                           tools=[latest_parent,
+                                  date_parent],
+                           downloader=LATimesDownloader),
 
-    wapo_parser = subparsers.add_parser('wapo',
-                            aliases=['wp'],
-                            parents=[latest_parent,
-                                      date_parent,
-                                      extractor_parent],
-                            help="download a Washington Post Sunday puzzle")
-    wapo_parser.set_defaults(downloader_class=WaPoDownloader)
+             SiteSubparser(full_name='Washington Post Sunday',
+                           command='wp',
+                           aliases=['wapo'],
+                           tools=[latest_parent,
+                                  date_parent],
+                           downloader=WaPoDownloader),
 
-    usatoday_parser = subparsers.add_parser('usa',
-                            aliases=[],
-                            parents=[latest_parent,
-                                      date_parent,
-                                      extractor_parent],
-                            help="download a USA Today puzzle")
-    usatoday_parser.set_defaults(downloader_class=USATodayDownloader)
+             SiteSubparser(full_name='USA Today',
+                           command='usa',
+                           aliases=[],
+                           tools=[latest_parent,
+                                  date_parent],
+                           downloader=USATodayDownloader),
 
-    atlantic_parser = subparsers.add_parser('atl',
-                            aliases=['atlantic'],
-                            parents=[latest_parent,
-                                      date_parent,
-                                      extractor_parent],
-                            help="download an Atlantic puzzle")
-    atlantic_parser.set_defaults(downloader_class=AtlanticDownloader)
+             SiteSubparser(full_name='Atlantic',
+                           command='atl',
+                           aliases=['atlantic'],
+                           tools=[latest_parent,
+                                  date_parent],
+                           downloader=AtlanticDownloader),
+            ]
+
+
+    for site in sites:
+        site.tools.append(extractor_parent)
+        subparsers.add_parser(site.command,
+                              aliases=site.aliases,
+                              parents=site.tools,
+                              help=site.help,
+                              ).set_defaults(downloader_class=site.downloader)
 
     args = parser.parse_args()
 
-    dl = args.downloader_class(output=args.output)
+    if args.subparser_name:
 
-    if args.date:
-        entered_date = ' '.join(args.date)
-        dl.find_by_date(entered_date)
+        dl = args.downloader_class(output=args.output)
 
-    elif args.spec_url:
-        dl.find_solver(args.spec_url)
+        if args.date:
+            entered_date = ' '.join(args.date)
+            dl.find_by_date(entered_date)
 
-    elif args.latest:
-        dl.find_latest()
+        elif args.spec_url:
+            dl.find_solver(args.spec_url)
 
-    dl.download()
-    dl.save_puz()
+        elif args.latest:
+            dl.find_latest()
+
+        dl.download()
+        dl.save_puz()
+
+    else:
+        sys.exit('You must provide a source for puzzle download.')
 
 
 if __name__ == '__main__':
